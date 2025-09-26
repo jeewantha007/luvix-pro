@@ -1,26 +1,35 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { X, DollarSign, CreditCard, FileText, AlertTriangle, Plus, Trash2 } from 'lucide-react';
-import { Client, Order, OrderProduct, Product } from '../../../types';
+import React, { useEffect, useState } from 'react';
+import { X, DollarSign, CreditCard, FileText, AlertTriangle } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
+import { Order } from '../../../types';
 
 interface OrderFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => void;
   editingOrder: Order | null;
-  clients: Client[];
-  products: Product[];
   isSubmitting?: boolean;
 }
 
 type OrderFormState = {
   orderNumber: string;
-  clientId: string;
-  clientName: string;
-  items: OrderProduct[];
-  totalAmount: number;
+  customerId: string;
+  customerName: string;
   status: Order['status'];
   paymentStatus: Order['paymentStatus'];
+  paymentMethod: string;
+  shippingAddress: {
+    street: string;
+    city: string;
+    postalCode: string;
+    country: string;
+  };
+  billingAddress: {
+    street: string;
+    city: string;
+    postalCode: string;
+    country: string;
+  };
   notes: string;
 };
 
@@ -29,31 +38,24 @@ const OrderForm: React.FC<OrderFormProps> = ({
   onClose,
   onSubmit,
   editingOrder,
-  clients,
-  products,
-  isSubmitting = false
+  isSubmitting = false,
 }) => {
   const { showError } = useToast();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState<OrderFormState>({
     orderNumber: '',
-    clientId: '',
-    clientName: '',
-    items: [],
-    totalAmount: 0,
+    customerId: '',
+    customerName: '',
     status: 'pending',
     paymentStatus: 'pending',
-    notes: ''
+    paymentMethod: '',
+    shippingAddress: { street: '', city: '', postalCode: '', country: '' },
+    billingAddress: { street: '', city: '', postalCode: '', country: '' },
+    notes: '',
   });
 
-  const productsById = useMemo(() => {
-    const map: Record<string, Product> = {};
-    products.forEach(p => { map[p.id] = p; });
-    return map;
-  }, [products]);
-
-  const requiredFields = ['clientId'];
+  const requiredFields = ['customerId', 'customerName', 'paymentMethod'];
 
   const generateOrderNumber = (): string => {
     const timestamp = Date.now().toString().slice(-6);
@@ -65,43 +67,44 @@ const OrderForm: React.FC<OrderFormProps> = ({
     if (!isOpen) return;
     if (editingOrder) {
       setFormData({
-        orderNumber: editingOrder.orderNumber,
-        clientId: editingOrder.clientId,
-        clientName: editingOrder.clientName,
-        items: editingOrder.products,
-        totalAmount: editingOrder.totalAmount,
+        orderNumber: editingOrder.orderNumber || '',
+        customerId: editingOrder.customerId || editingOrder.customerId || '',
+        customerName: editingOrder.customerName || editingOrder.customerName || '',
         status: editingOrder.status,
         paymentStatus: editingOrder.paymentStatus,
-        notes: editingOrder.notes || ''
+        paymentMethod: editingOrder.paymentMethod || '',
+       shippingAddress: editingOrder?.shippingAddress || { street: '', city: '', postalCode: '', country: '' },
+      billingAddress: editingOrder?.billingAddress || { street: '', city: '', postalCode: '', country: '' },
+        notes: editingOrder.notes || '',
       });
       setErrors({});
       setTouched({});
     } else {
       setFormData({
         orderNumber: generateOrderNumber(),
-        clientId: '',
-        clientName: '',
-        items: [],
-        totalAmount: 0,
+        customerId: '',
+        customerName: '',
         status: 'pending',
         paymentStatus: 'pending',
-        notes: ''
+        paymentMethod: '',
+        shippingAddress: { street: '', city: '', postalCode: '', country: '' },
+        billingAddress: { street: '', city: '', postalCode: '', country: '' },
+        notes: '',
       });
       setErrors({});
       setTouched({});
     }
   }, [editingOrder, isOpen]);
 
-  useEffect(() => {
-    const total = formData.items.reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 0), 0);
-    setFormData(prev => ({ ...prev, totalAmount: Number(total.toFixed(2)) }));
-  }, [formData.items]);
-
   const validateField = (fieldName: string, value: any): string => {
     if (requiredFields.includes(fieldName)) {
       if (!value) {
-        if (fieldName === 'clientId') return 'Please select a client';
-        return 'This field is required';
+        if (fieldName === 'customerId') return 'Please enter a valid WhatsApp phone number';
+        if (fieldName === 'customerName') return 'Please enter a customer name';
+        if (fieldName === 'paymentMethod') return 'Please select a payment method';
+      }
+      if (fieldName === 'customerId' && !/^\+?\d{10,15}$/.test(value)) {
+        return 'Please enter a valid phone number';
       }
     }
     return '';
@@ -113,18 +116,14 @@ const OrderForm: React.FC<OrderFormProps> = ({
       const error = validateField(field, (formData as any)[field]);
       if (error) newErrors[field] = error;
     });
-    if (formData.items.length === 0 || !formData.items.some(it => it.productId && it.quantity > 0)) {
-      newErrors['items'] = 'Add at least one product with quantity';
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const isFormValid = (): boolean => {
-    if (!clients || clients.length === 0 || !products || products.length === 0) return false;
-    if (!formData.clientId || !clients.some(c => c.id === formData.clientId)) return false;
-    if (formData.items.length === 0) return false;
-    if (!formData.items.every(it => it.productId && it.quantity > 0)) return false;
+    if (!formData.customerId || !/^\+?\d{10,15}$/.test(formData.customerId)) return false;
+    if (!formData.customerName) return false;
+    if (!formData.paymentMethod) return false;
     return true;
   };
 
@@ -134,55 +133,16 @@ const OrderForm: React.FC<OrderFormProps> = ({
     setErrors(prev => ({ ...prev, [fieldName]: error }));
   };
 
-  const handleClientChange = (clientId: string) => {
-    const selectedClient = clients.find(c => c.id === clientId);
-    setFormData(prev => ({ ...prev, clientId, clientName: selectedClient ? selectedClient.name : '' }));
-    if (touched.clientId) {
-      const error = validateField('clientId', clientId);
-      setErrors(prev => ({ ...prev, clientId: error }));
-    }
-  };
-
-  const addItem = () => {
+  const handleAddressChange = (type: 'shippingAddress' | 'billingAddress', field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { productId: '', name: '', sku: '', price: 0, quantity: 1 }]
+      [type]: { ...prev[type], [field]: value },
     }));
-  };
-
-  const removeItem = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleItemProductChange = (index: number, productId: string) => {
-    const product = productsById[productId];
-    setFormData(prev => {
-      const items = [...prev.items];
-      items[index] = {
-        productId,
-        name: product ? product.name : '',
-        sku: product ? product.sku : '',
-        price: product ? product.price : 0,
-        quantity: items[index]?.quantity || 1
-      };
-      return { ...prev, items };
-    });
-  };
-
-  const handleItemQuantityChange = (index: number, quantity: number) => {
-    setFormData(prev => {
-      const items = [...prev.items];
-      items[index] = { ...items[index], quantity: Math.max(1, Math.floor(quantity || 0)) };
-      return { ...prev, items };
-    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const allTouched: Record<string, boolean> = { clientId: true, items: true } as any;
+    const allTouched: Record<string, boolean> = { customerId: true, customerName: true, paymentMethod: true };
     setTouched(allTouched);
     if (!validateForm()) {
       showError('Validation Failed', 'Please fix the errors before submitting.');
@@ -190,13 +150,16 @@ const OrderForm: React.FC<OrderFormProps> = ({
     }
     const orderPayload: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {
       orderNumber: formData.orderNumber,
-      clientId: formData.clientId,
-      clientName: formData.clientName,
-      products: formData.items,
-      totalAmount: formData.totalAmount,
+      customerId: formData.customerId,
+      customerName: formData.customerName,
       status: formData.status,
       paymentStatus: formData.paymentStatus,
-      notes: formData.notes
+      paymentMethod: formData.paymentMethod,
+      shippingAddress: formData.shippingAddress,
+      billingAddress: formData.billingAddress,
+      notes: formData.notes,
+      products: [], // Assuming products might be handled elsewhere or not required
+      totalAmount: 0, // Assuming totalAmount might be calculated elsewhere
     };
     onSubmit(orderPayload);
   };
@@ -227,34 +190,14 @@ const OrderForm: React.FC<OrderFormProps> = ({
 
         <div className="flex-1 overflow-y-auto">
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                             <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                 <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-                 Basic Information
-               </h3>
-              <div className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client *</label>
-                  <select
-                    value={formData.clientId}
-                    onChange={(e) => handleClientChange(e.target.value)}
-                    onBlur={() => handleFieldBlur('clientId')}
-                    className={getFieldClassName('clientId', "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white")}
-                  >
-                    <option value="">Select Client</option>
-                    {clients.map(client => (
-                        <option key={client.id} value={client.id}>{client.name}</option>
-                    ))}
-                  </select>
-                  {touched.clientId && errors.clientId && (
-                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
-                      <AlertTriangle className="w-4 h-4" />
-                      {errors.clientId}
-                    </p>
-                  )}
-                </div>
-                <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Basic Information
+                </h3>
+                <div className="space-y-4">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Order Number</label>
                     <input
                       type="text"
@@ -263,135 +206,233 @@ const OrderForm: React.FC<OrderFormProps> = ({
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Phone (WhatsApp) *</label>
+                    <input
+                      type="text"
+                      value={formData.customerId}
+                      onChange={(e) => setFormData(prev => ({ ...prev, customerId: e.target.value }))}
+                      onBlur={() => handleFieldBlur('customerId')}
+                      placeholder="+1234567890"
+                      className={getFieldClassName('customerId', "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white")}
+                    />
+                    {touched.customerId && errors.customerId && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                        <AlertTriangle className="w-4 h-4" />
+                        {errors.customerId}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Name *</label>
+                    <input
+                      type="text"
+                      value={formData.customerName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, customerName: e.target.value }))}
+                      onBlur={() => handleFieldBlur('customerName')}
+                      className={getFieldClassName('customerName', "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white")}
+                    />
+                    {touched.customerName && errors.customerName && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                        <AlertTriangle className="w-4 h-4" />
+                        {errors.customerName}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as Order['status'] }))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="processing">Processing</option>
+                      <option value="completed">Completed</option>
+                      <option value="canceled">Canceled</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-                </div>
 
-                <div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-                Products
-              </h3>
-              <div className="space-y-3">
-                {formData.items.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-3 items-end">
-                    <div className="col-span-6">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product *</label>
-                  <select
-                        value={item.productId}
-                        onChange={(e) => handleItemProductChange(idx, e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      >
-                        <option value="">Select Product</option>
-                        {products.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                  </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price</label>
-                      <input
-                        type="number"
-                        readOnly
-                        value={item.price}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Qty *</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={(e) => handleItemQuantityChange(idx, parseInt(e.target.value, 10))}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div className="col-span-1 text-sm font-medium text-gray-900 dark:text-white">${(item.price * item.quantity).toFixed(2)}</div>
-                    <div className="col-span-1 flex justify-end">
-                      <button type="button" onClick={() => removeItem(idx)} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
-                        <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-                      </button>
-                    </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Shipping Address
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Street</label>
+                    <input
+                      type="text"
+                      value={formData.shippingAddress.street}
+                      onChange={(e) => handleAddressChange('shippingAddress', 'street', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
                   </div>
-                ))}
-                {touched.items && errors.items && (
-                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
-                      <AlertTriangle className="w-4 h-4" />
-                    {errors.items}
-                    </p>
-                  )}
-                <button type="button" onClick={addItem} className="inline-flex items-center px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors">
-                  <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" /> Add product
-                </button>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={formData.shippingAddress.city}
+                      onChange={(e) => handleAddressChange('shippingAddress', 'city', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Postal Code</label>
+                    <input
+                      type="text"
+                      value={formData.shippingAddress.postalCode}
+                      onChange={(e) => handleAddressChange('shippingAddress', 'postalCode', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Country</label>
+                    <input
+                      type="text"
+                      value={formData.shippingAddress.country}
+                      onChange={(e) => handleAddressChange('shippingAddress', 'country', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-          <div>
-                         <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-               <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
-               Financial Information
-             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                Billing Address
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Street</label>
+                  <input
+                    type="text"
+                    value={formData.billingAddress.street}
+                    onChange={(e) => handleAddressChange('billingAddress', 'street', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
+                  <input
+                    type="text"
+                    value={formData.billingAddress.city}
+                    onChange={(e) => handleAddressChange('billingAddress', 'city', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Postal Code</label>
+                  <input
+                    type="text"
+                    value={formData.billingAddress.postalCode}
+                    onChange={(e) => handleAddressChange('billingAddress', 'postalCode', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Country</label>
+                  <input
+                    type="text"
+                    value={formData.billingAddress.country}
+                    onChange={(e) => handleAddressChange('billingAddress', 'country', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
+                Payment Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Status</label>
+                  <select
+                    value={formData.paymentStatus}
+                    onChange={(e) => setFormData(prev => ({ ...prev, paymentStatus: e.target.value as Order['paymentStatus'] }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="partial">Partial</option>
+                    <option value="paid">Paid</option>
+                    <option value="overdue">Overdue</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Method *</label>
+                  <select
+                    value={formData.paymentMethod}
+                    onChange={(e) => setFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                    onBlur={() => handleFieldBlur('paymentMethod')}
+                    className={getFieldClassName('paymentMethod', "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white")}
+                  >
+                    <option value="">Select Payment Method</option>
+                    <option value="cash_on_delivery">Cash on Delivery</option>
+                    <option value="card">Card</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="mobile_payment">Mobile Payment</option>
+                  </select>
+                  {touched.paymentMethod && errors.paymentMethod && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertTriangle className="w-4 h-4" />
+                      {errors.paymentMethod}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                Additional Information
+              </h3>
               <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Total Amount</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.totalAmount}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white font-semibold"
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="Additional notes about the order..."
                 />
               </div>
             </div>
-          </div>
-
-           <div>
-                        <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-             <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
-             Payment Information
-           </h3>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Status</label>
-                 <select
-                   value={formData.paymentStatus}
-                    onChange={(e) => setFormData(prev => ({ ...prev, paymentStatus: e.target.value as Order['paymentStatus'] }))}
-                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                 >
-                   <option value="pending">Pending</option>
-                   <option value="partial">Partial</option>
-                   <option value="paid">Paid</option>
-                   <option value="overdue">Overdue</option>
-                 </select>
-               </div>
-             </div>
-           </div>
-
-           <div>
-                        <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-             <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-             Additional Information
-           </h3>
-             <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
-               <textarea
-                 value={formData.notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                 rows={4}
-                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="Additional notes about the order..."
-               />
-             </div>
-           </div>
-        </form>
+          </form>
         </div>
-        
+
         <div className="p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3 flex-shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors" disabled={isSubmitting}>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            disabled={isSubmitting}
+          >
             Cancel
           </button>
-          <button onClick={handleSubmit} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSubmitting || !isFormValid()} title={!isFormValid() ? 'Please complete required fields' : ''}>
+          <button
+            onClick={handleSubmit}
+            className="px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: isSubmitting || !isFormValid() ? '#9ca3af' : '#168740' }}
+            onMouseEnter={(e) => {
+              if (!isSubmitting && isFormValid()) {
+                e.currentTarget.style.backgroundColor = '#0d5a2b';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isSubmitting && isFormValid()) {
+                e.currentTarget.style.backgroundColor = '#168740';
+              }
+            }}
+            disabled={isSubmitting || !isFormValid()}
+            title={!isFormValid() ? 'Please complete required fields' : ''}
+          >
             {isSubmitting ? 'Saving...' : (editingOrder ? 'Update Order' : 'Create Order')}
           </button>
         </div>

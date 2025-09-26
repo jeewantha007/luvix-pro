@@ -306,151 +306,6 @@ export interface DatabaseCustomer {
 }
 
 
-
-// Database types for CMS
-
-export interface DatabaseClient {
-  id: string;
-  user_id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  date_of_birth?: string;
-  nationality: string;
-  current_country: string;
-  target_country: string;
-  passport_number?: string;
-  marital_status?: 'single' | 'married' | 'divorced' | 'widowed';
-  family_members?: FamilyMember[];
-  employment_status?: 'employed' | 'unemployed' | 'student' | 'retired' | 'self_employed';
-  education_level?: 'high_school' | 'bachelor' | 'master' | 'phd' | 'other';
-  income_level?: 'low' | 'medium' | 'high' | 'very_high';
-  criminal_record: boolean;
-  health_conditions?: string;
-  emergency_contact?: EmergencyContact;
-  address?: Address;
-  notes?: string;
-  total_cases: number;
-  total_spent: number;
-  status: 'active' | 'inactive' | 'prospect';
-  photo_url?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-
-
-// Immigration Service Types
-export interface Service {
-  id: string;
-  name: string;
-  description?: string;
-  serviceType: 'main' | 'sub'; // main service or sub-service
-  parentServiceId?: string; // for sub-services, reference to parent service
-  category: 'business_immigration' | 'family_sponsorship' | 'student_visa' | 'work_permit' | 'citizenship' | 'refugee_asylum' | 'appeals' | 'general';
-  country: string; // UK, USA, Canada, Australia, etc.
-  basePrice: number;
-  currency: string;
-  requirements: string[];
-  documentsRequired: string[];
-  processingStages: string[];
-  isActive: boolean;
-  languageSupport: string[];
-  features: string[]; // Key features of the service
-  imageUrl?: string; // URL to service image
-  createdAt: Date;
-  updatedAt: Date;
-  subServices?: Service[]; // For main services, list of sub-services
-}
-
-export interface DatabaseService {
-  id: string;
-  user_id: string;
-  name: string;
-  description?: string;
-  service_type: 'main' | 'sub';
-  parent_service_id?: string;
-  category: 'business_immigration' | 'family_sponsorship' | 'student_visa' | 'work_permit' | 'citizenship' | 'refugee_asylum' | 'appeals' | 'general';
-  country: string;
-  base_price: number;
-  currency: string;
-  requirements: string[];
-  documents_required: string[];
-  processing_stages: string[];
-  is_active: boolean;
-  language_support: string[];
-  features: string[];
-  image_url?: string | { url: string } | null;
-  created_at: string;
-  updated_at: string;
-}
-
-// Immigration Client Types
-
-
-
-// Immigration Case Types
-export interface Case {
-  id: string;
-  caseNumber: string;
-  clientId: string;
-  clientName: string;
-  serviceId: string;
-  serviceName: string;
-  serviceBasePrice: number; // Reference to service base price for comparison
-  caseType: 'new_application' | 'renewal' | 'appeal' | 'extension' | 'change_of_status';
-  status: 'initial_consultation' | 'document_collection' | 'application_submitted' | 'under_review' | 'additional_documents_requested' | 'interview_scheduled' | 'approved' | 'rejected' | 'appeal_filed' | 'completed';
-  priority: 'low' | 'normal' | 'high' | 'urgent';
-  submissionDate?: Date;
-  expectedCompletionDate?: Date;
-  actualCompletionDate?: Date;
-  governmentFees: number; // Government application fees
-  serviceFees: number; // Your firm's service fees (can differ from base price)
-  additionalFees?: number; // Extra fees for complexity, urgency, etc.
-  discount?: number; // Discount applied (client relationship, bulk, etc.)
-  totalAmount: number; // Final amount: serviceFees + governmentFees + additionalFees - discount
-  paymentStatus: 'pending' | 'partial' | 'paid' | 'overdue';
-  pricingNotes?: string; // Notes about why price differs from base price
-  notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface CaseDocument {
-  id: string;
-  name: string;
-  type: string;
-  url: string;
-  uploadedAt: Date;
-  status: 'pending' | 'verified' | 'rejected';
-  notes?: string;
-}
-
-
-
-export interface DatabaseCase {
-  id: string;
-  user_id: string;
-  case_number: string;
-  client_id: string;
-  client_name: string;
-  service_id: string;
-  service_name: string;
-  case_type: 'new_application' | 'renewal' | 'appeal' | 'extension' | 'change_of_status';
-  status: 'initial_consultation' | 'document_collection' | 'application_submitted' | 'under_review' | 'additional_documents_requested' | 'interview_scheduled' | 'approved' | 'rejected' | 'appeal_filed' | 'completed';
-  priority: 'low' | 'normal' | 'high' | 'urgent';
-  submission_date?: string;
-  expected_completion_date?: string;
-  actual_completion_date?: string;
-  government_fees: number;
-  service_fees: number;
-  total_amount: number;
-  payment_status: 'pending' | 'partial' | 'paid' | 'overdue';
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-}
-
 // Product Types for Product-based CRM
 export interface Product {
   id: string;
@@ -479,26 +334,35 @@ export interface Product {
   updatedAt: Date;
 }
 
-// Order Types for Product-based CRM
-export interface OrderProduct {
-  productId: string;
-  name: string;
-  sku?: string;
-  price: number;
-  quantity: number;
-  imageUrl?: string;
+// Product in an order
+export interface OrderItem {
+  id?: string;            // UUID, auto-generated
+  orderId?: string;       // UUID, set after order creation
+  productId: string;      // selected product
+  productName: string;    // auto-filled from product table
+  quantity: number;       // entered by user
+  unitPrice: number;      // auto-filled from product table, editable if needed
+  totalPrice?: number;    // calculated: quantity * unitPrice
+  createdAt?: Date;       // auto-generated
 }
-
+// Order
 export interface Order {
-  id: string;
-  orderNumber: string;
-  clientId: string;
-  clientName: string;
-  products: OrderProduct[];
-  totalAmount: number;
+  id?: string;                    // UUID, auto-generated
+  orderNumber?: string;           // auto-generated
+  userId?: string;                // logged-in user ID
+  customerId: string;             // selected customer
+  customerName?: string;          // auto-filled from customer selection
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   paymentStatus: 'pending' | 'partial' | 'paid' | 'overdue';
+  paymentMethod?: 'cash' | 'card' | 'bank_transfer' | 'other';
+  shippingAddress: Record<string, any>; // JSON structure: street, city, postal code, country
+  billingAddress: Record<string, any>;  // JSON structure
   notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  totalAmount?: number;           // calculated from order items
+  taxAmount?: number;             // optional
+  discountAmount?: number;        // optional
+  shippingAmount?: number;        // optional
+  items: OrderItem[];             // order items
+  createdAt?: Date;               // auto-generated
+  updatedAt?: Date;               // auto-generated
 }

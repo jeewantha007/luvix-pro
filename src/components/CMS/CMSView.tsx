@@ -169,7 +169,6 @@ const CMSView: React.FC = () => {
             <OrderList
               selectedOrder={selectedItem}
               onOrderSelect={setSelectedItem}
-              onBack={() => setSelectedItem(null)}
             />
           )}
         </div>

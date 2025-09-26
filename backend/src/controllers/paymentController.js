@@ -111,7 +111,7 @@ export const paymentController = {
         .from('subscription_plans')
         .select('id, name, plan_type, price, stripe_price_id, features')
         .eq('is_active', true)
-        .eq('plan_type', 'monthly')
+        .eq('plan_type', 'monthly-p')
         .order('price', { ascending: true });
 
       if (error) {
