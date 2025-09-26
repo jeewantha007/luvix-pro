@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar styles for better scrolling experience */
+@layer utilities {
+  .scroll-smooth {
+    scroll-behavior: smooth;
+  }
+  
+  /* Custom scrollbar for webkit browsers */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 4px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+  
+  /* Dark mode scrollbar */
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #4b5563;
+  }
+  
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+  }
+  
+  /* Ensure scrollbars are always visible */
+  .custom-scrollbar {
+    scrollbar-width: auto; /* Firefox */
+    scrollbar-color: #d1d5db transparent; /* Firefox */
+  }
+  
+  .dark .custom-scrollbar {
+    scrollbar-color: #4b5563 transparent; /* Firefox */
+  }
+  
+  /* Force scrollbar visibility for webkit browsers */
+  .custom-scrollbar::-webkit-scrollbar {
+    -webkit-appearance: none;
+    width: 8px;
+    height: 8px;
+  }
+  
+  /* Ensure content doesn't get cut off */
+  .overflow-auto {
+    overflow: auto !important;
+  }
+  
+  .overflow-y-auto {
+    overflow-y: auto !important;
+  }
+  
+  /* Line clamp utilities */
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+  
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+  
+  /* Force scrollbar visibility */
+  .force-scrollbar {
+    overflow: auto !important;
+    scrollbar-width: auto !important;
+  }
+  
+  .force-scrollbar::-webkit-scrollbar {
+    width: 8px !important;
+    height: 8px !important;
+    display: block !important;
+  }
+  
+  /* Ensure proper height constraints */
+  .h-full {
+    height: 100% !important;
+  }
+  
+  .min-h-0 {
+    min-height: 0 !important;
+  }
+  
+  /* Service card specific styles */
+  .service-card {
+    min-height: fit-content;
+    height: auto;
+    overflow: visible;
+  }
+  
+  .service-card img {
+    object-fit: cover;
+    width: 64px;
+    height: 64px;
+  }
+  
+  /* Ensure proper flex behavior */
+  .flex-1 {
+    flex: 1 1 0% !important;
+  }
+  
+  .flex-shrink-0 {
+    flex-shrink: 0 !important;
+  }
+}

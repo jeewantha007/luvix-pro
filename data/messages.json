@@ -1,0 +1,54 @@
+[
+  {
+      "id": "94778072233",
+      "created_at": "2025-08-12 10:02:40.396891+00",
+      "user_message": "Do you have any vacancies for Australia?",
+      "created_at_bot_message": "2025-08-12 10:02:40.396891",
+      "bot_message": null,
+      "profile_name": "Ruchira Sachinthana"
+  },
+  {
+      "id": "94778072233",
+      "created_at": "2025-08-12 10:31:23.544294+00",
+      "user_message": {
+          "body": "Okay"
+      },
+      "created_at_bot_message": "2025-08-12 10:31:23.544294",
+      "bot_message": "Great! 😊 ඔයාට අවශ්‍ය assistance එකක්, queries, හෝ guidance තියනවානම්, ඔයාට උවමනාවක් තියන services එකක් ගැන detail එකක් දන්වන්න. I'm here to help!",
+      "profile_name": "Ruchira Sachinthana"
+  },
+  {
+      "id": "94778072233",
+      "created_at": "2025-08-12 10:31:53.757303+00",
+      "user_message": {
+          "body": "Okay"
+      },
+      "created_at_bot_message": "2025-08-12 10:31:53.757303",
+      "bot_message": "Great! 😊 ඔයාට අවශ්‍ය assistance එකක්, queries, හෝ guidance තියනවානම්, ඔයාට උවමනාවක් තියන services එකක් ගැන detail එකක් දන්වන්න. I'm here to help!",
+      "profile_name": "Ruchira Sachinthana"
+  },
+  {
+      "id": "94778072233",
+      "created_at": "2025-08-12 10:39:06.008923+00",
+      "user_message": "Thank you for help",
+      "created_at_bot_message": "2025-08-12 10:39:06.008923",
+      "bot_message": "tool_call: message_save \nYou're welcome! 😊 ඔබට අවශ්‍ය වෙන assistance එකක් හෝ questions තියෙනවානම්, ඕනෑම වෙලාවක message කරන්න. Have a great day! 🌟",
+      "profile_name": "Ruchira Sachinthana"
+  },
+  {
+      "id": "94778072233",
+      "created_at": "2025-08-12 10:40:23.576389+00",
+      "user_message": "Great day",
+      "created_at_bot_message": "2025-08-12 10:40:23.576389",
+      "bot_message": "Thanks! 😊 ඔයාටත් සුභ දවසක්! If you need anything else, feel free to reach out. 🌟",
+      "profile_name": "Ruchira Sachinthana"
+  },
+  {
+      "id": "94778072233",
+      "created_at": "2025-08-12 11:04:31.272406+00",
+      "user_message": null,
+      "created_at_bot_message": "2025-08-12 11:04:31.272406",
+      "bot_message": "Hi! මුලින්ම, මට මොකක්ද පුහුණු වුනේ කියලා කියන්න පුළුවන්ද? එය study, visa, හෝ migration සහයද, නැත්නම් වෙනත් assistance එකක් ද? මම තොරතුරු සොයා බලන්න විශේෂිත විෂයයන් අනුව guide කරන්න. 😊",
+      "profile_name": "Ruchira Sachinthana"
+  }
+]

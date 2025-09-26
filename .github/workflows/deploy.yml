@@ -1,0 +1,239 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main   # Runs only when pushing to deploy/dev branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 3️⃣ Install dependencies
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # 4️⃣ Create frontend .env
+      - name: Create .env for frontend
+        run: |
+          echo "VITE_SUPABASE_TABLE=${{ secrets.VITE_SUPABASE_TABLE }}" >> .env
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env
+          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
+          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
+
+      # 5️⃣ Build Vite app
+      - name: Build frontend
+        run: npm run build
+
+      # 6️⃣ Clean EC2 target directories
+      - name: Clean EC2 directories
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "=== Cleaning EC2 directories ==="
+            sudo rm -rf /var/www/html/*
+            sudo mkdir -p /var/www/html
+            sudo chown -R $USER:$USER /var/www/html
+            sudo rm -rf /opt/luvix-backend/*
+            sudo mkdir -p /opt/luvix-backend
+            sudo chown -R $USER:$USER /opt/luvix-backend
+
+      # 7️⃣ Deploy frontend build files
+      - name: Upload frontend to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "dist/**"
+          target: "/var/www/html"
+          strip_components: 1
+
+      # 8️⃣ Deploy backend files
+      - name: Upload backend to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "server/**,package*.json,data/**"
+          target: "/opt/luvix-backend"
+
+      # 9️⃣ Install backend dependencies
+      - name: Install backend dependencies
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd /opt/luvix-backend
+            npm ci --production
+
+      # 🔟 Create backend environment file
+      - name: Create backend .env
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd /opt/luvix-backend
+            cat > .env << EOF
+            SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+            SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+            VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+            VITE_SUPABASE_TABLE=${{ secrets.VITE_SUPABASE_TABLE }}
+            PORT=4000
+            NODE_ENV=production
+            EOF
+
+      # 1️⃣1️⃣ Setup PM2 ecosystem file
+      - name: Setup PM2 ecosystem
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd /opt/luvix-backend
+            cat > ecosystem.config.cjs << EOF
+            module.exports = {
+              apps: [{
+                name: 'luvix-backend',
+                script: 'server/server.js',
+                cwd: '/opt/luvix-backend',
+                instances: 1,
+                autorestart: true,
+                watch: false,
+                max_memory_restart: '1G',
+                env_file: '.env',
+                env: {
+                  NODE_ENV: 'production',
+                  PORT: 4000
+                }
+              }]
+            };
+            EOF
+
+      # 1️⃣2️⃣ Restart backend with PM2
+      - name: Restart backend with PM2
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd /opt/luvix-backend
+            pm2 delete luvix-backend || true
+            pm2 start ecosystem.config.cjs
+            pm2 save
+            sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $USER --hp /home/$USER || true
+
+      # 1️⃣3️⃣ Configure Nginx reverse proxy
+      - name: Configure Nginx
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            sudo tee /etc/nginx/sites-available/luvix << EOF
+            server {
+                listen 80;
+                server_name hofi.luvix.live;
+
+                # Frontend
+                location / {
+                    root /var/www/html;
+                    try_files \$uri \$uri/ /index.html;
+                }
+
+                # Backend API
+                location /api/ {
+                    proxy_pass http://localhost:4000;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection 'upgrade';
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                    proxy_cache_bypass \$http_upgrade;
+                }
+            }
+            EOF
+
+            sudo ln -sf /etc/nginx/sites-available/luvix /etc/nginx/sites-enabled/
+            sudo rm -f /etc/nginx/sites-enabled/default
+            sudo nginx -t
+            sudo systemctl restart nginx
+
+      # 1️⃣3.0️⃣ Ensure firewall allows HTTP/HTTPS
+      - name: Open firewall for HTTP/HTTPS
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            if command -v ufw >/dev/null 2>&1; then
+              sudo ufw allow 'Nginx Full' || true
+              sudo ufw delete allow 'Nginx HTTP' || true
+            fi
+            sudo systemctl reload nginx || true
+
+      # 1️⃣3.1️⃣ Enable HTTPS with Let's Encrypt (Certbot)
+      - name: Enable HTTPS (Let's Encrypt)
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            sudo apt-get update
+            sudo apt-get install -y certbot python3-certbot-nginx
+            sudo certbot --nginx -d hofi.luvix.live --non-interactive --agree-tos --redirect --email "wemixtsubs.lk@gmail.com" || true
+            sudo certbot certificates || true
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+      # 1️⃣4️⃣ Set ownership & permissions
+      - name: Fix ownership & permissions
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            sudo chown -R www-data:www-data /var/www/html
+            sudo chmod -R 755 /var/www/html
+            sudo chown -R ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} /opt/luvix-backend
+            sudo chmod -R 755 /opt/luvix-backend
+
+      # 1️⃣5️⃣ Health check
+      - name: Backend health check
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            sleep 10
+            curl -f http://localhost:4000/api/health || (echo "❌ Backend health check failed" && pm2 logs luvix-backend --lines 50 && exit 1)
