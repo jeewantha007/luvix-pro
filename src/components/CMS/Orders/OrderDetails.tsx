@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, ArrowLeft, User, CreditCard, MapPin, Clock, DollarSign } from 'lucide-react';
+import { FileText, ArrowLeft, User, CreditCard, MapPin, Clock, DollarSign, Package, Phone, Mail } from 'lucide-react';
 import { Order } from '../../../types';
+import { getProductById } from '../../../services/productService';
 
 interface OrderDetailsProps {
   order: Order | null;
@@ -9,9 +10,32 @@ interface OrderDetailsProps {
 
 const OrderDetails: React.FC<OrderDetailsProps> = ({ order, onBack }) => {
   const [currentOrder, setCurrentOrder] = useState<Order | null>(order);
+  const [productImages, setProductImages] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setCurrentOrder(order);
+  }, [order]);
+
+  // Fetch product images when order changes
+  useEffect(() => {
+    const fetchProductImages = async () => {
+      if (order && order.items.length > 0) {
+        const images: Record<string, string> = {};
+        for (const item of order.items) {
+          try {
+            const product = await getProductById(item.productId);
+            if (product && product.images && product.images.length > 0) {
+              images[item.productId] = product.images[0];
+            }
+          } catch (error) {
+            console.error(`Error fetching image for product ${item.productId}:`, error);
+          }
+        }
+        setProductImages(images);
+      }
+    };
+
+    fetchProductImages();
   }, [order]);
 
   if (!currentOrder) {
@@ -114,9 +138,11 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order, onBack }) => {
 
       {/* Content */}
       <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Order Summary - New Section */}
+        {/* Order Summary */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Order Summary</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Total Amount */}
             <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Total Amount</p>
@@ -124,8 +150,10 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order, onBack }) => {
                   {formatCurrency(currentOrder.totalAmount || 0)}
                 </p>
               </div>
-              <DollarSign className="w-8 h-8 text-gray-500" />
+              <DollarSign className="w-8 h-8 text-green-500" />
             </div>
+            
+            {/* Total Items */}
             <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Total Items</p>
@@ -136,17 +164,19 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order, onBack }) => {
                   ({currentOrder.items.length} {currentOrder.items.length === 1 ? 'product' : 'products'})
                 </p>
               </div>
-              <FileText className="w-8 h-8 text-gray-500" />
+              <Package className="w-8 h-8 text-blue-500" />
             </div>
+            
+            {/* Status */}
             <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {currentOrder.status.charAt(0).toUpperCase() + currentOrder.status.slice(1)}
+                <p className="text-2xl font-bold text-gray-900 dark:text-white capitalize">
+                  {currentOrder.status}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {currentOrder.paymentStatus}
-                </p>
+                <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(currentOrder.status)}`}>
+                  {currentOrder.status}
+                </span>
               </div>
               <div className={`w-8 h-8 rounded-full ${getStatusColor(currentOrder.status).split(' ')[0]}`}></div>
             </div>
@@ -159,14 +189,24 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order, onBack }) => {
             <User className="w-5 h-5 mr-2 text-gray-500" />
             Customer Information
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Customer Name</p>
-              <p className="text-sm text-gray-900 dark:text-white">{currentOrder.customerName}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <User className="w-5 h-5 text-gray-500 mt-0.5" />
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Customer Name</p>
+                  <p className="text-base font-bold text-gray-900 dark:text-white">{currentOrder.customerName}</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">WhatsApp Number</p>
-              <p className="text-sm text-gray-900 dark:text-white">{currentOrder.contactNo}</p>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <Phone className="w-5 h-5 text-gray-500 mt-0.5" />
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">WhatsApp Number</p>
+                  <p className="text-base font-bold text-gray-900 dark:text-white">{currentOrder.contactNo}</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -177,204 +217,98 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order, onBack }) => {
             <FileText className="w-5 h-5 mr-2 text-gray-500" />
             Order Status
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <FileText className="w-5 h-5 text-gray-500" />
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</p>
-                <span className={`px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(currentOrder.status)}`}>
-                  {currentOrder.status.charAt(0).toUpperCase() + currentOrder.status.slice(1)}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <CreditCard className="w-5 h-5 text-gray-500" />
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Payment Status</p>
-                <span className={`px-3 py-1 text-sm font-medium rounded-full ${getPaymentStatusColor(currentOrder.paymentStatus)}`}>
-                  {currentOrder.paymentStatus.charAt(0).toUpperCase() + currentOrder.paymentStatus.slice(1)}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <CreditCard className="w-5 h-5 text-gray-500" />
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Payment Method</p>
-                <p className="text-sm text-gray-900 dark:text-white">
-                  {currentOrder.paymentMethod
-                    ? currentOrder.paymentMethod.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-                    : 'Not specified'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Addresses */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-            <MapPin className="w-5 h-5 mr-2 text-gray-500" />
-            Addresses
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Shipping Address</p>
-              <p className="text-sm text-gray-900 dark:text-white">{formatAddress(currentOrder.shippingAddress)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Billing Address</p>
-              <p className="text-sm text-gray-900 dark:text-white">{formatAddress(currentOrder.billingAddress)}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Order Information */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-            <FileText className="w-5 h-5 mr-2 text-gray-500" />
-            Order Information
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <FileText className="w-5 h-5 text-gray-500" />
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Order Number</p>
-                <p className="text-sm text-gray-900 dark:text-white">{currentOrder.orderNumber}</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <Clock className="w-5 h-5 text-gray-500" />
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Created</p>
-                <p className="text-sm text-gray-900 dark:text-white">{formatDateForDisplay(currentOrder.createdAt)}</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <Clock className="w-5 h-5 text-gray-500" />
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last Updated</p>
-                <p className="text-sm text-gray-900 dark:text-white">{formatDateForDisplay(currentOrder.updatedAt)}</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <DollarSign className="w-5 h-5 text-gray-500" />
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Amount</p>
-                <p className="text-sm text-gray-900 dark:text-white font-medium">{formatCurrency(currentOrder.totalAmount || 0)}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Financials */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-            <CreditCard className="w-5 h-5 mr-2 text-gray-500" />
-            Financials
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="flex items-center">
-                  <DollarSign className="w-5 h-5 text-gray-500 mr-2" />
-                  <span className="text-sm text-gray-600 dark:text-gray-300">Subtotal</span>
-                </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {formatCurrency((currentOrder.totalAmount || 0) - (currentOrder.taxAmount || 0) - (currentOrder.shippingAmount || 0) + (currentOrder.discountAmount || 0))}
-                </span>
-              </div>
-              
-              {currentOrder.discountAmount !== undefined && currentOrder.discountAmount > 0 && (
-                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="flex items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Discount</span>
-                  </div>
-                  <span className="text-sm font-medium text-green-600 dark:text-green-400">
-                    -{formatCurrency(currentOrder.discountAmount)}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <FileText className="w-5 h-5 text-gray-500 mt-0.5" />
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</p>
+                  <span className={`px-3 py-1 text-sm font-bold rounded-full ${getStatusColor(currentOrder.status)}`}>
+                    {currentOrder.status.charAt(0).toUpperCase() + currentOrder.status.slice(1)}
                   </span>
                 </div>
-              )}
-              
-              {currentOrder.taxAmount !== undefined && currentOrder.taxAmount > 0 && (
-                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="flex items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Tax</span>
-                  </div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    +{formatCurrency(currentOrder.taxAmount)}
-                  </span>
-                </div>
-              )}
-              
-              {currentOrder.shippingAmount !== undefined && currentOrder.shippingAmount > 0 && (
-                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="flex items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Shipping</span>
-                  </div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    +{formatCurrency(currentOrder.shippingAmount)}
-                  </span>
-                </div>
-              )}
-              
-              <div className="flex justify-between items-center p-3 bg-gray-100 dark:bg-gray-600 rounded-lg mt-2">
-                <div className="flex items-center">
-                  <DollarSign className="w-5 h-5 text-gray-700 dark:text-gray-300 mr-2" />
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Total Amount</span>
-                </div>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(currentOrder.totalAmount || 0)}
-                </span>
               </div>
             </div>
-            
-            <div className="flex flex-col justify-center items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(currentOrder.totalAmount || 0)}
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <CreditCard className="w-5 h-5 text-gray-500 mt-0.5" />
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Payment Status</p>
+                  <span className={`px-3 py-1 text-sm font-bold rounded-full ${getPaymentStatusColor(currentOrder.paymentStatus)}`}>
+                    {currentOrder.paymentStatus.charAt(0).toUpperCase() + currentOrder.paymentStatus.slice(1)}
+                  </span>
+                </div>
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">Order Total</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                {currentOrder.items.reduce((total, item) => total + Math.max(item.quantity || 0, 0), 0)} items
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <CreditCard className="w-5 h-5 text-gray-500 mt-0.5" />
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Payment Method</p>
+                  <p className="text-base font-bold text-gray-900 dark:text-white">
+                    {currentOrder.paymentMethod
+                      ? currentOrder.paymentMethod.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                      : 'Not specified'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Products */}
+        {/* Order Items */}
         {currentOrder.items.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                <FileText className="w-5 h-5 mr-2 text-gray-500" />
-                Products
+                <Package className="w-5 h-5 mr-2 text-gray-500" />
+                Order Items
               </h2>
-              <div className="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded-full text-sm font-medium">
-                <FileText className="w-4 h-4 mr-1" />
+              <div className="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded-full text-sm font-bold">
+                <Package className="w-4 h-4 mr-1" />
                 {currentOrder.items.length} {currentOrder.items.length === 1 ? 'item' : 'items'}
               </div>
             </div>
-            <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden max-h-96 overflow-y-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Product</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Unit Price</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Quantity</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
+                    <th className="px-4 py-3 text-left text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Product</th>
+                    <th className="px-4 py-3 text-right text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Unit Price</th>
+                    <th className="px-4 py-3 text-right text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Quantity</th>
+                    <th className="px-4 py-3 text-right text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Total</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {currentOrder.items.map((item, idx) => (
                     <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-4 py-4 text-sm text-gray-900 dark:text-white">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-4">
                           <div className="flex-shrink-0">
-                            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 flex items-center justify-center">
-                              <span className="text-xs text-gray-500 dark:text-gray-400">No image</span>
+                            <div className="w-20 h-20 bg-gray-200 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 flex items-center justify-center overflow-hidden">
+                              {productImages[item.productId] ? (
+                                <img 
+                                  src={productImages[item.productId]} 
+                                  alt={item.productName} 
+                                  className="w-full h-full object-contain"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    // Show fallback text
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      parent.innerHTML = '<span class="text-xs text-gray-500 dark:text-gray-400">No image</span>';
+                                      parent.className = 'w-20 h-20 bg-gray-200 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 flex items-center justify-center';
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <span className="text-xs text-gray-500 dark:text-gray-400">No image</span>
+                              )}
                             </div>
                           </div>
                           <div>
-                            <div className="font-medium">{item.productName}</div>
+                            <div className="font-bold text-base">{item.productName}</div>
                             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                               ID: {item.productId.substring(0, 8)}...
                             </div>
@@ -382,13 +316,13 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order, onBack }) => {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900 dark:text-white text-right">
-                        <div className="font-medium">{formatCurrency(item.unitPrice)}</div>
+                        <div className="font-bold text-base">{formatCurrency(item.unitPrice)}</div>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900 dark:text-white text-right">
-                        <div className="font-medium">{item.quantity}</div>
+                        <div className="font-bold text-base">{item.quantity}</div>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900 dark:text-white text-right">
-                        <div className="font-medium">{formatCurrency(item.totalPrice || 0)}</div>
+                        <div className="font-bold text-base">{formatCurrency(item.totalPrice || 0)}</div>
                         {item.quantity && item.unitPrice && item.quantity > 1 && (
                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             ({item.quantity} × {formatCurrency(item.unitPrice)})
@@ -398,15 +332,15 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order, onBack }) => {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-gray-50 dark:bg-gray-700">
+                <tfoot className="bg-gray-100 dark:bg-gray-700 sticky bottom-0 z-10">
                   <tr>
-                    <td colSpan={2} className="px-4 py-3 text-sm text-gray-900 dark:text-white font-medium">
+                    <td colSpan={2} className="px-4 py-3 text-base text-gray-900 dark:text-white font-bold">
                       Total Items
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white text-right font-medium">
+                    <td className="px-4 py-3 text-base text-gray-900 dark:text-white text-right font-bold">
                       {currentOrder.items.reduce((total, item) => total + Math.max(item.quantity || 0, 0), 0)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white text-right font-medium">
+                    <td className="px-4 py-3 text-base text-gray-900 dark:text-white text-right font-bold">
                       {formatCurrency(currentOrder.totalAmount || 0)}
                     </td>
                   </tr>
@@ -415,6 +349,136 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order, onBack }) => {
             </div>
           </div>
         )}
+
+        {/* Addresses */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+            <MapPin className="w-5 h-5 mr-2 text-gray-500" />
+            Addresses
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <MapPin className="w-5 h-5 text-gray-500 mt-0.5" />
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Shipping Address</p>
+                  <p className="text-base font-medium text-gray-900 dark:text-white">{formatAddress(currentOrder.shippingAddress)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <MapPin className="w-5 h-5 text-gray-500 mt-0.5" />
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Billing Address</p>
+                  <p className="text-base font-medium text-gray-900 dark:text-white">{formatAddress(currentOrder.billingAddress)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Information */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Order Information */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+              <FileText className="w-5 h-5 mr-2 text-gray-500" />
+              Order Information
+            </h2>
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <FileText className="w-5 h-5 text-gray-500 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Order Number</p>
+                    <p className="text-base font-bold text-gray-900 dark:text-white">{currentOrder.orderNumber}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <Clock className="w-5 h-5 text-gray-500 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Created</p>
+                    <p className="text-base font-bold text-gray-900 dark:text-white">{formatDateForDisplay(currentOrder.createdAt)}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <Clock className="w-5 h-5 text-gray-500 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last Updated</p>
+                    <p className="text-base font-bold text-gray-900 dark:text-white">{formatDateForDisplay(currentOrder.updatedAt)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Financials */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+              <DollarSign className="w-5 h-5 mr-2 text-gray-500" />
+              Financials
+            </h2>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center">
+                  <DollarSign className="w-5 h-5 text-gray-500 mr-2" />
+                  <span className="text-base font-medium text-gray-700 dark:text-gray-300">Subtotal</span>
+                </div>
+                <span className="text-base font-bold text-gray-900 dark:text-white">
+                  {formatCurrency((currentOrder.totalAmount || 0) - (currentOrder.taxAmount || 0) - (currentOrder.shippingAmount || 0) + (currentOrder.discountAmount || 0))}
+                </span>
+              </div>
+              
+              {currentOrder.discountAmount !== undefined && currentOrder.discountAmount > 0 && (
+                <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center">
+                    <span className="text-base font-medium text-gray-700 dark:text-gray-300">Discount</span>
+                  </div>
+                  <span className="text-base font-bold text-green-600 dark:text-green-400">
+                    -{formatCurrency(currentOrder.discountAmount)}
+                  </span>
+                </div>
+              )}
+              
+              {currentOrder.taxAmount !== undefined && currentOrder.taxAmount > 0 && (
+                <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center">
+                    <span className="text-base font-medium text-gray-700 dark:text-gray-300">Tax</span>
+                  </div>
+                  <span className="text-base font-bold text-gray-900 dark:text-white">
+                    +{formatCurrency(currentOrder.taxAmount)}
+                  </span>
+                </div>
+              )}
+              
+              {currentOrder.shippingAmount !== undefined && currentOrder.shippingAmount > 0 && (
+                <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center">
+                    <span className="text-base font-medium text-gray-700 dark:text-gray-300">Shipping</span>
+                  </div>
+                  <span className="text-base font-bold text-gray-900 dark:text-white">
+                    +{formatCurrency(currentOrder.shippingAmount)}
+                  </span>
+                </div>
+              )}
+              
+              <div className="flex justify-between items-center p-4 bg-gray-100 dark:bg-gray-600 rounded-lg mt-2">
+                <div className="flex items-center">
+                  <DollarSign className="w-5 h-5 text-gray-700 dark:text-gray-300 mr-2" />
+                  <span className="text-base font-bold text-gray-900 dark:text-white">Total Amount</span>
+                </div>
+                <span className="text-xl font-bold text-gray-900 dark:text-white">
+                  {formatCurrency(currentOrder.totalAmount || 0)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Notes */}
         {currentOrder.notes && (
@@ -426,7 +490,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order, onBack }) => {
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <p className="text-sm text-gray-700 dark:text-gray-300">{currentOrder.notes}</p>
             </div>
-        </div>
+          </div>
         )}
 
         {/* Order Progress Timeline */}
