@@ -3,23 +3,23 @@ import {
   Plus, Search, Edit, Trash2, User, Filter,
   Mail, Phone, DollarSign, Users
 } from 'lucide-react';
-import { Client } from '../../../types';
+import { Client, Customer } from '../../../types';
 import { useIsMobile } from '../../../hooks/useMediaQuery';
 import { useToast } from '../../../context/ToastContext';
 import { 
-  getClients, 
-  createClient, 
-  updateClient, 
-  deleteClient, 
-  searchClients,
-  uploadClientPhoto
-} from '../../../services/clientService';
+  getCustomers as getClients, 
+  createCustomer as createClient, 
+  updateCustomer as updateClient, 
+  deleteCustomer as deleteClient, 
+  searchCustomers as searchClients
+} from '../../../services/customerService';
+import { customerToClient, clientToCustomer, clientUpdatesToCustomerUpdates } from '../../../utils/customerClientMapper';
 import ClientForm from './ClientForm';
 import ClientDetails from './ClientDetails';
 
 interface ClientListProps {
   selectedClient?: Client | null;
-  onClientSelect: (client: Client) => void;
+  onClientSelect: (client: Client | null) => void;
 }
 
 const ClientList: React.FC<ClientListProps> = ({ selectedClient, onClientSelect }) => {
@@ -90,7 +90,7 @@ const ClientList: React.FC<ClientListProps> = ({ selectedClient, onClientSelect 
     try {
       setIsLoading(true);
       const data = await getClients();
-      setClients(data);
+      setClients(data.map(customerToClient));
     } catch (error) {
       console.error('Error loading clients:', error);
       showError('Load Failed', 'Failed to load clients data. Please try refreshing the page.');
@@ -108,7 +108,7 @@ const ClientList: React.FC<ClientListProps> = ({ selectedClient, onClientSelect 
     try {
       setIsLoading(true);
       const data = await searchClients(searchTerm);
-      setClients(data);
+      setClients(data.map(customerToClient));
     } catch (error) {
       console.error('Error searching clients:', error);
       showError('Search Failed', 'Failed to search clients. Please try again.');
@@ -117,20 +117,10 @@ const ClientList: React.FC<ClientListProps> = ({ selectedClient, onClientSelect 
     }
   };
 
-  const handleAddClient = async (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>, photoFile?: File | null) => {
+  const handleAddClient = async (customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       setIsSubmitting(true);
-      const newClient = await createClient(clientData);
-      
-      // Upload photo if provided
-      if (photoFile && newClient) {
-        try {
-          await uploadClientPhoto(newClient.id, photoFile);
-        } catch (photoError) {
-          console.error('Error uploading photo:', photoError);
-          showWarning('Photo Upload Failed', 'Client created but photo upload failed. You can try uploading the photo again by editing the client.');
-        }
-      }
+      const newCustomer = await createClient(customerData);
       
       setShowAddModal(false);
       loadClients();
@@ -143,22 +133,15 @@ const ClientList: React.FC<ClientListProps> = ({ selectedClient, onClientSelect 
     }
   };
 
-  const handleEditClient = async (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>, photoFile?: File | null) => {
+  const handleEditClient = async (customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!editingClient) return;
 
     try {
       setIsSubmitting(true);
-      await updateClient(editingClient.id, clientData);
+      // Convert the partial updates to customer updates
+      const customerUpdates = clientUpdatesToCustomerUpdates(customerData);
       
-      // Upload new photo if provided
-      if (photoFile) {
-        try {
-          await uploadClientPhoto(editingClient.id, photoFile);
-        } catch (photoError) {
-          console.error('Error uploading photo:', photoError);
-          showWarning('Photo Upload Failed', 'Client updated but photo upload failed. Please try uploading the photo again.');
-        }
-      }
+      const updatedCustomer = await updateClient(editingClient.id, customerUpdates);
       
       setShowEditModal(false);
       setEditingClient(null);
@@ -451,7 +434,17 @@ const ClientList: React.FC<ClientListProps> = ({ selectedClient, onClientSelect 
           setEditingClient(null);
         }}
         onSubmit={showAddModal ? handleAddClient : handleEditClient}
-        editingClient={editingClient}
+        editingCustomer={editingClient ? {
+          name: editingClient.name,
+          email: editingClient.email,
+          phone: editingClient.phone,
+          address: editingClient.address,
+          notes: editingClient.notes,
+          totalOrders: editingClient.totalCases,
+          totalSpent: editingClient.totalSpent,
+          createdAt: editingClient.createdAt,
+          updatedAt: editingClient.updatedAt
+        } as Customer : null}
         isSubmitting={isSubmitting}
       />
 

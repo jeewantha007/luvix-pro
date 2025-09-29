@@ -1,99 +1,69 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, User, FileText, Home, Upload, Trash2 } from 'lucide-react';
-import { Client, Address } from '../../../types';
+import React, { useEffect, useState } from 'react';
+import { X, User, Mail, Phone, MapPin, FileText } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
+import { Address, Customer } from '../../../types';
+import { createCustomer as createClient, updateCustomer as updateClient } from '../../../services/customerService';
 
 interface ClientFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (client: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>, photoFile?: File | null) => void;
-  editingClient: Client | null;
-  isSubmitting: boolean;
+  onSubmit: (customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  editingCustomer: Customer | null;
+  isSubmitting?: boolean;
 }
 
 const ClientForm: React.FC<ClientFormProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  editingClient,
-  isSubmitting
+  editingCustomer,
+  isSubmitting = false,
 }) => {
+  const { showError } = useToast();
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    dateOfBirth: '',
-    nationality: '',
-    currentCountry: '',
-    targetCountry: '',
     address: {
       street: '',
       city: '',
       state: '',
       zipCode: '',
       country: ''
-    } as Address,
-    notes: '',
-    totalCases: 0,
-    totalSpent: 0,
-    status: 'active' as Client['status']
+    },
+    notes: ''
   });
 
-  // Photo upload state
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const requiredFields = ['name'];
 
-  // Validation state
-  type ValidationErrors = {
-    name?: string;
-    email?: string;
-    phone?: string;
-  };
-  const [errors, setErrors] = useState<ValidationErrors>({});
-  const { showError } = useToast();
-
-  // Populate form when editing
   useEffect(() => {
-    if (editingClient) {
+    if (!isOpen) return;
+    if (editingCustomer) {
+      // Handle address data more robustly
+      const addressData = editingCustomer.address || {};
+      
       setFormData({
-        name: editingClient.name,
-        email: editingClient.email || '',
-        phone: editingClient.phone || '',
-        dateOfBirth: editingClient.dateOfBirth ? editingClient.dateOfBirth.toISOString().split('T')[0] : '',
-        nationality: editingClient.nationality || '',
-        currentCountry: editingClient.currentCountry || '',
-        targetCountry: editingClient.targetCountry || '',
-        address: editingClient.address || {
-          street: '',
-          city: '',
-          state: '',
-          zipCode: '',
-          country: ''
+        name: editingCustomer.name || '',
+        email: editingCustomer.email || '',
+        phone: editingCustomer.phone || '',
+        address: {
+          street: (addressData as Address).street || '',
+          city: (addressData as Address).city || '',
+          state: (addressData as Address).state || '',
+          zipCode: (addressData as Address).zipCode || (addressData as any).postalCode || '',
+          country: (addressData as Address).country || ''
         },
-        notes: editingClient.notes || '',
-        totalCases: editingClient.totalCases,
-        totalSpent: editingClient.totalSpent,
-        status: editingClient.status
+        notes: editingCustomer.notes || ''
       });
-      
-      // Set photo preview if editing client has a photo
-      setPhotoPreview(editingClient.photoUrl || null);
-      setPhotoFile(null);
-      
-      // Clear errors when editing
       setErrors({});
+      setTouched({});
     } else {
-      // Reset form for new client
       setFormData({
         name: '',
         email: '',
         phone: '',
-        dateOfBirth: '',
-        nationality: '',
-        currentCountry: '',
-        targetCountry: '',
         address: {
           street: '',
           city: '',
@@ -101,350 +71,272 @@ const ClientForm: React.FC<ClientFormProps> = ({
           zipCode: '',
           country: ''
         },
-        notes: '',
-        totalCases: 0,
-        totalSpent: 0,
-        status: 'active'
+        notes: ''
       });
-      
-      // Reset photo state for new client
-      setPhotoPreview(null);
-      setPhotoFile(null);
-      
-      // Clear errors for new client
       setErrors({});
+      setTouched({});
     }
-  }, [editingClient, isOpen]);
+  }, [editingCustomer, isOpen]);
 
-  // Validation functions
-  const validateName = (name: string): string | undefined => {
-    if (!name.trim()) {
-      return 'Full name is required';
+  const validateField = (fieldName: string, value: any): string => {
+    if (requiredFields.includes(fieldName) && !value) {
+      return 'This field is required';
     }
-    if (name.trim().length < 2) {
-      return 'Full name must be at least 2 characters long';
-    }
-    if (name.trim().length > 100) {
-      return 'Full name must be less than 100 characters';
-    }
-    return undefined;
-  };
-
-  const validateEmail = (email: string): string | undefined => {
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    
+    if (fieldName === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
       return 'Please enter a valid email address';
     }
-    return undefined;
-  };
-
-  const validatePhone = (phone: string): string | undefined => {
-    if (phone.trim()) {
-      // Remove all non-digit characters except + at the beginning
-      const cleanedPhone = phone.replace(/[^\d+]/g, '');
-      
-      // Check if it starts with + and has 7-15 digits, or just has 7-15 digits
-      if (!/^(\+?[1-9]\d{6,14})$/.test(cleanedPhone)) {
-        return 'Please enter a valid phone number (7-15 digits)';
-      }
+    
+    if (fieldName === 'phone' && value && !/^\+?[\d\s\-\(\)]+$/.test(value)) {
+      return 'Please enter a valid phone number';
     }
-    return undefined;
+    
+    return '';
   };
-
-  // Country, emergency, and address validations removed for product customers
 
   const validateForm = (): boolean => {
-    const newErrors: ValidationErrors = {};
-
-    // Validate required fields
-    const nameError = validateName(formData.name);
-    if (nameError) newErrors.name = nameError;
-
-    const emailError = validateEmail(formData.email);
-    if (emailError) newErrors.email = emailError;
-
-    const phoneError = validatePhone(formData.phone);
-    if (phoneError) newErrors.phone = phoneError;
-
-    // nationality/currentCountry/targetCountry/address are optional for product customers
-
+    const newErrors: Record<string, string> = {};
+    requiredFields.forEach(field => {
+      const error = validateField(field, (formData as any)[field]);
+      if (error) newErrors[field] = error;
+    });
+    
+    // Validate email if provided
+    if (formData.email) {
+      const emailError = validateField('email', formData.email);
+      if (emailError) newErrors.email = emailError;
+    }
+    
+    // Validate phone if provided
+    if (formData.phone) {
+      const phoneError = validateField('phone', formData.phone);
+      if (phoneError) newErrors.phone = phoneError;
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Check if form is valid for submit button state
-  const isFormValid = () => {
-    return !!formData.name.trim();
+  const isFormValid = (): boolean => {
+    return formData.name.trim() !== '';
   };
 
-  const handleInputChange = (field: keyof typeof formData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Clear error when user starts typing
-    if (errors[field as keyof ValidationErrors]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
-    }
+  const handleFieldBlur = (fieldName: string) => {
+    setTouched(prev => ({ ...prev, [fieldName]: true }));
+    const error = validateField(fieldName, (formData as any)[fieldName]);
+    setErrors(prev => ({ ...prev, [fieldName]: error }));
   };
 
-  // Emergency contact removed for product customers
-
-  const handleAddressChange = (field: keyof Address, value: string) => {
+  const handleAddressChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       address: { ...prev.address, [field]: value }
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const allTouched: Record<string, boolean> = { name: true };
+    setTouched(allTouched);
     
     if (!validateForm()) {
+      showError('Validation Failed', 'Please fix the errors before submitting.');
       return;
     }
     
-    const clientData = {
-      ...formData,
-      dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth) : undefined,
-      criminalRecord: false
-    };
-
-    onSubmit(clientData, photoFile);
-  };
-
-
-
-  // Photo handling functions
-  const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-      if (!allowedTypes.includes(file.type)) {
-        showError('Invalid File Type', 'Please select a valid image file (JPEG, PNG, WebP, or GIF)');
-        return;
-      }
-
-      // Validate file size (5MB limit)
-      const maxSize = 5 * 1024 * 1024; // 5MB
-      if (file.size > maxSize) {
-        showError('File Too Large', 'File size too large. Maximum size is 5MB.');
-        return;
-      }
-
-      setPhotoFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPhotoPreview(e.target?.result as string);
+    try {
+      const customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'> = {
+        name: formData.name,
+        email: formData.email || undefined,
+        phone: formData.phone || undefined,
+        address: formData.address.street || formData.address.city || formData.address.state || 
+                 formData.address.zipCode || formData.address.country ? formData.address : undefined,
+        notes: formData.notes || undefined,
+        totalOrders: 0,
+        totalSpent: 0
       };
-      reader.readAsDataURL(file);
+      
+      await onSubmit(customerData);
+    } catch (error: any) {
+      showError('Customer Save Failed', error.message || 'Failed to save customer. Please try again.');
     }
   };
 
-  const handlePhotoRemove = () => {
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
+  const getFieldClassName = (fieldName: string, baseClassName: string) => {
+    const hasError = touched[fieldName] && errors[fieldName];
+    const isValid = touched[fieldName] && !errors[fieldName] && (formData as any)[fieldName];
+    if (hasError) return `${baseClassName} border-red-500 focus:ring-red-500 focus:border-red-500`;
+    if (isValid) return `${baseClassName} border-green-500 focus:ring-green-500 focus:border-green-500`;
+    return baseClassName;
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-[9999]">
-      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col">
-        {/* Fixed Header */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col">
         <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div className="flex items-center justify-between">
             <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
-              {editingClient ? 'Edit Client' : 'Add New Client'}
+              {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
             </h2>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
               <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
           </div>
         </div>
 
-        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
-          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-          {/* Customer Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
             <div>
               <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <User className="w-4 h-4 sm:w-5 sm:h-5" />
-                Customer Information
-               </h3>
+                Basic Information
+              </h3>
               <div className="space-y-4">
-                {/* Photo Upload Section */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Client Photo
-                  </label>
-                  <div className="flex items-center gap-4">
-                    {/* Photo Preview */}
-                    <div className="relative">
-                      {photoPreview ? (
-                        <div className="relative">
-                          <img
-                            src={photoPreview}
-                            alt="Client photo preview"
-                            className="w-20 h-20 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
-                          />
-                          <button
-                            type="button"
-                            onClick={handlePhotoRemove}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs transition-colors"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-semibold text-xl border-2 border-gray-200 dark:border-gray-600">
-                          {formData.name.charAt(0).toUpperCase() || '?'}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Upload Controls */}
-                    <div className="flex flex-col gap-2">
-                      <button
-                        type="button"
-                        onClick={triggerFileInput}
-                        className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        <Upload className="w-4 h-4" />
-                        {photoPreview ? 'Change Photo' : 'Upload Photo'}
-                      </button>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        JPEG, PNG, WebP, GIF up to 5MB
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Hidden file input */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={handlePhotoSelect}
-                    className="hidden"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Full Name *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name *</label>
                   <input
                     type="text"
                     value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    required
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    onBlur={() => handleFieldBlur('name')}
+                    placeholder="Enter customer's full name"
+                    className={getFieldClassName('name', "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white")}
                   />
-                  {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                  {touched.name && errors.name && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                      {errors.name}
+                    </p>
+                  )}
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                  {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                  {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
-                </div>
-
-                {/* Optional: DOB */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date of Birth</label>
-                  <input type="date" value={formData.dateOfBirth} onChange={(e) => handleInputChange('dateOfBirth', e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email Address</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                        onBlur={() => handleFieldBlur('email')}
+                        placeholder="customer@example.com"
+                        className={getFieldClassName('email', "w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white")}
+                      />
+                    </div>
+                    {touched.email && errors.email && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                        {errors.email}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number</label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                        onBlur={() => handleFieldBlur('phone')}
+                        placeholder="+1 (555) 123-4567"
+                        className={getFieldClassName('phone', "w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white")}
+                      />
+                    </div>
+                    {touched.phone && errors.phone && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                        {errors.phone}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Address (Optional) */}
             <div>
               <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <Home className="w-4 h-4 sm:w-5 sm:h-5" />
-                Address (optional)
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
+                Address
               </h3>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input type="text" placeholder="Street Address" value={formData.address.street} onChange={(e) => handleAddressChange('street', e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-                  <input type="text" placeholder="City" value={formData.address.city} onChange={(e) => handleAddressChange('city', e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-                  <input type="text" placeholder="State/Province" value={formData.address.state} onChange={(e) => handleAddressChange('state', e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-                  <input type="text" placeholder="ZIP/Postal Code" value={formData.address.zipCode} onChange={(e) => handleAddressChange('zipCode', e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-                  <input type="text" placeholder="Country" value={formData.address.country} onChange={(e) => handleAddressChange('country', e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white md:col-span-2" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Street</label>
+                  <input
+                    type="text"
+                    value={formData.address.street}
+                    onChange={(e) => handleAddressChange('street', e.target.value)}
+                    placeholder="Street address"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
+                  <input
+                    type="text"
+                    value={formData.address.city}
+                    onChange={(e) => handleAddressChange('city', e.target.value)}
+                    placeholder="City"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">State/Province</label>
+                  <input
+                    type="text"
+                    value={formData.address.state}
+                    onChange={(e) => handleAddressChange('state', e.target.value)}
+                    placeholder="State or Province"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ZIP/Postal Code</label>
+                  <input
+                    type="text"
+                    value={formData.address.zipCode}
+                    onChange={(e) => handleAddressChange('zipCode', e.target.value)}
+                    placeholder="ZIP or Postal Code"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Country</label>
+                  <input
+                    type="text"
+                    value={formData.address.country}
+                    onChange={(e) => handleAddressChange('country', e.target.value)}
+                    placeholder="Country"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
                 </div>
               </div>
             </div>
-          </div>
-          {/* Additional Information */}
-          <div>
-            <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-               <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-               Additional Information
-             </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => handleInputChange('status', e.target.value as Client['status'])}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
 
+            <div>
+              <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                Additional Information
+              </h3>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Notes
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
                 <textarea
                   value={formData.notes}
-                  onChange={(e) => handleInputChange('notes', e.target.value)}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="Additional notes about the client..."
+                  placeholder="Additional notes about the customer..."
                 />
               </div>
             </div>
-          </div>
-
-        </form>
+          </form>
         </div>
-        
-        {/* Fixed Footer */}
+
         <div className="p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3 flex-shrink-0">
           <button
             onClick={onClose}
@@ -455,10 +347,22 @@ const ClientForm: React.FC<ClientFormProps> = ({
           </button>
           <button
             onClick={handleSubmit}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: isSubmitting || !isFormValid() ? '#9ca3af' : '#168740' }}
+            onMouseEnter={(e) => {
+              if (!isSubmitting && isFormValid()) {
+                e.currentTarget.style.backgroundColor = '#0d5a2b';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isSubmitting && isFormValid()) {
+                e.currentTarget.style.backgroundColor = '#168740';
+              }
+            }}
             disabled={isSubmitting || !isFormValid()}
+            title={!isFormValid() ? 'Please complete required fields' : ''}
           >
-            {isSubmitting ? 'Saving...' : (editingClient ? 'Update Client' : 'Create Client')}
+            {isSubmitting ? 'Saving...' : (editingCustomer ? 'Update Customer' : 'Create Customer')}
           </button>
         </div>
       </div>
@@ -466,4 +370,4 @@ const ClientForm: React.FC<ClientFormProps> = ({
   );
 };
 
-export default ClientForm; 
+export default ClientForm;
