@@ -3,6 +3,7 @@ import { Search, Plus, Edit, Trash2, FileText, Filter, DollarSign, CheckCircle, 
 import { Order } from '../../../types';
 import { useToast } from '../../../context/ToastContext';
 import OrderForm from './OrderForm';
+import { getOrders, createOrder, updateOrder } from '../../../services/orderService';
 
 interface OrderListProps {
   selectedOrder: Order | null;
@@ -47,65 +48,20 @@ const OrderList: React.FC<OrderListProps> = ({ selectedOrder, onOrderSelect }) =
     setFilteredOrders(filtered);
   }, [orders, searchTerm, statusFilter, paymentStatusFilter]);
 
-  const loadData = () => {
+  const loadData = async () => {
     setIsLoading(true);
-    const mockOrders: Order[] = [
-      {
-        id: '1',
-        orderNumber: 'ORD-001',
-        customerId: '+1234567890',
-        customerName: 'John Doe',
-        status: 'processing',
-        paymentStatus: 'paid',
-        paymentMethod: 'card',
-        shippingAddress: {
-          street: '123 Main St',
-          city: 'New York',
-          postalCode: '10001',
-          country: 'USA'
-        },
-        billingAddress: {
-          street: '123 Main St',
-          city: 'New York',
-          postalCode: '10001',
-          country: 'USA'
-        },
-        notes: 'Customer requested express shipping',
-        products: [],
-        totalAmount: 0,
-        createdAt: new Date('2025-09-15'),
-        updatedAt: new Date('2025-09-15')
-      },
-      {
-        id: '2',
-        orderNumber: 'ORD-002',
-        customerId: '+1987654321',
-        customerName: 'Jane Smith',
-        status: 'delivered',
-        paymentStatus: 'paid',
-        paymentMethod: 'cash',
-        shippingAddress: {
-          street: '456 Elm St',
-          city: 'Toronto',
-          postalCode: 'M5V 2T6',
-          country: 'Canada'
-        },
-        billingAddress: {
-          street: '456 Elm St',
-          city: 'Toronto',
-          postalCode: 'M5V 2T6',
-          country: 'Canada'
-        },
-        notes: 'Include gift wrapping',
-        products: [],
-        totalAmount: 0,
-        createdAt: new Date('2025-09-14'),
-        updatedAt: new Date('2025-09-16')
-      }
-    ];
-    setOrders(mockOrders);
-    setFilteredOrders(mockOrders);
-    setIsLoading(false);
+    try {
+      // Fetch real data from Supabase
+      const fetchedOrders = await getOrders();
+      
+      setOrders(fetchedOrders);
+      setFilteredOrders(fetchedOrders);
+    } catch (error: any) {
+      console.error('Error fetching orders:', error);
+      showError('Load Failed', error.message || 'Failed to load orders. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSearch = () => {
@@ -241,6 +197,8 @@ const OrderList: React.FC<OrderListProps> = ({ selectedOrder, onOrderSelect }) =
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
                 <option value="shipped">Shipped</option>
                 <option value="delivered">Delivered</option>
                 <option value="cancelled">Cancelled</option>
@@ -371,18 +329,16 @@ const OrderList: React.FC<OrderListProps> = ({ selectedOrder, onOrderSelect }) =
         <OrderForm
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
-          onSubmit={(orderData) => {
-            const newOrder: Order = {
-              id: (orders.length + 1).toString(),
-              ...orderData,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              totalAmount: 0
-            };
-            setOrders(prev => [newOrder, ...prev]);
-            setFilteredOrders(prev => [newOrder, ...prev]);
-            setShowAddModal(false);
-            showSuccess('Order Created', 'Order has been successfully created!');
+          onSubmit={async (orderData) => {
+            try {
+              const newOrder = await createOrder(orderData);
+              setOrders(prev => [newOrder, ...prev]);
+              setFilteredOrders(prev => [newOrder, ...prev]);
+              setShowAddModal(false);
+              showSuccess('Order Created', 'Order has been successfully created!');
+            } catch (error: any) {
+              showError('Order Creation Failed', error.message || 'Failed to create order. Please try again.');
+            }
           }}
           editingOrder={null}
         />
@@ -396,12 +352,22 @@ const OrderList: React.FC<OrderListProps> = ({ selectedOrder, onOrderSelect }) =
             setShowEditModal(false);
             setEditingOrder(null);
           }}
-          onSubmit={(orderData) => {
-            setOrders(prev => prev.map(o => o.id === editingOrder.id ? { ...o, ...orderData, updatedAt: new Date() } : o));
-            setFilteredOrders(prev => prev.map(o => o.id === editingOrder.id ? { ...o, ...orderData, updatedAt: new Date() } : o));
-            setShowEditModal(false);
-            setEditingOrder(null);
-            showSuccess('Order Updated', 'Order has been successfully updated!');
+          onSubmit={async (orderData) => {
+            try {
+              if (!editingOrder.id) {
+                showError('Update Failed', 'Order ID is missing.');
+                return;
+              }
+              
+              const updatedOrder = await updateOrder(editingOrder.id, orderData);
+              setOrders(prev => prev.map(o => o.id === editingOrder.id ? updatedOrder : o));
+              setFilteredOrders(prev => prev.map(o => o.id === editingOrder.id ? updatedOrder : o));
+              setShowEditModal(false);
+              setEditingOrder(null);
+              showSuccess('Order Updated', 'Order has been successfully updated!');
+            } catch (error: any) {
+              showError('Order Update Failed', error.message || 'Failed to update order. Please try again.');
+            }
           }}
           editingOrder={editingOrder}
         />

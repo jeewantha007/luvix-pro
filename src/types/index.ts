@@ -345,18 +345,21 @@ export interface OrderItem {
   totalPrice?: number;    // calculated: quantity * unitPrice
   createdAt?: Date;       // auto-generated
 }
+
 // Order
 export interface Order {
   id?: string;                    // UUID, auto-generated
   orderNumber?: string;           // auto-generated
   userId?: string;                // logged-in user ID
-  customerId: string;             // selected customer
+  customerId: string;             // UUID of selected customer
+  contactNo?: string;             // Customer Phone (WhatsApp)
   customerName?: string;          // auto-filled from customer selection
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  customerEmail?: string;         // Customer email address
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'completed' | 'canceled';
   paymentStatus: 'pending' | 'partial' | 'paid' | 'overdue';
   paymentMethod?: 'cash' | 'card' | 'bank_transfer' | 'other';
-  shippingAddress: Record<string, any>; // JSON structure: street, city, postal code, country
-  billingAddress: Record<string, any>;  // JSON structure
+  shippingAddress: { street: string; city: string; postalCode: string; country: string }; // JSON structure: street, city, postal code, country
+  billingAddress: { street: string; city: string; postalCode: string; country: string };  // JSON structure
   notes?: string;
   totalAmount?: number;           // calculated from order items
   taxAmount?: number;             // optional

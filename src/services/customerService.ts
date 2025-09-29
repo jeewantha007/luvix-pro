@@ -1,5 +1,5 @@
 import { supabase } from '../../data/supabaseClient';
-import { Customer, DatabaseCustomer } from '../types';
+import { Customer, DatabaseCustomer, Address } from '../types';
 
 // Convert DatabaseCustomer to Customer interface
 const convertDatabaseCustomer = (dbCustomer: DatabaseCustomer): Customer => ({
@@ -7,7 +7,7 @@ const convertDatabaseCustomer = (dbCustomer: DatabaseCustomer): Customer => ({
   name: dbCustomer.name,
   email: dbCustomer.email || '',
   phone: dbCustomer.phone || '',
-  address: dbCustomer.address || {},
+  address: dbCustomer.address || undefined,
   notes: dbCustomer.notes || '',
   totalOrders: dbCustomer.total_orders,
   totalSpent: dbCustomer.total_spent,
@@ -86,6 +86,24 @@ export const getCustomerById = async (id: string): Promise<Customer | null> => {
     .from('customers')
     .select('*')
     .eq('id', id)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null; // No rows returned
+    }
+    throw new Error(`Error fetching customer: ${error.message}`);
+  }
+
+  return convertDatabaseCustomer(data);
+};
+
+// Get customer by phone number
+export const getCustomerByPhone = async (phone: string): Promise<Customer | null> => {
+  const { data, error } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('phone', phone)
     .single();
 
   if (error) {
@@ -209,22 +227,49 @@ export const updateCustomerStats = async (id: string, totalOrders: number, total
   return convertDatabaseCustomer(data);
 };
 
-// Recalculate customer stats from orders (useful when orders are modified)
-export const recalculateCustomerStats = async (customerId: string): Promise<void> => {
-  // Get all orders for this customer
-  const { data: orders, error: ordersError } = await supabase
-    .from('orders')
-    .select('total_amount')
-    .eq('customer_id', customerId);
-
-  if (ordersError) {
-    throw new Error(`Error fetching orders for customer ${customerId}: ${ordersError.message}`);
+// Get or create customer by phone number
+export const getOrCreateCustomer = async (customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>): Promise<Customer> => {
+  try {
+    // First, try to find existing customer by phone
+    if (customerData.phone) {
+      const existingCustomer = await getCustomerByPhone(customerData.phone);
+      if (existingCustomer) {
+        // Update customer info if needed
+        const updates: Partial<Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>> = {};
+        let needsUpdate = false;
+        
+        if (customerData.name && customerData.name !== existingCustomer.name) {
+          updates.name = customerData.name;
+          needsUpdate = true;
+        }
+        
+        if (customerData.email && customerData.email !== existingCustomer.email) {
+          updates.email = customerData.email;
+          needsUpdate = true;
+        }
+        
+        if (customerData.address && 
+            ((customerData.address as Address).street || 
+             (customerData.address as Address).city || 
+             (customerData.address as Address).state || 
+             (customerData.address as Address).zipCode || 
+             (customerData.address as Address).country)) {
+          updates.address = customerData.address;
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          return await updateCustomer(existingCustomer.id, updates);
+        }
+        
+        return existingCustomer;
+      }
+    }
+    
+    // If no existing customer found, create a new one
+    return await createCustomer(customerData);
+  } catch (error) {
+    console.error('Error in getOrCreateCustomer:', error);
+    throw error;
   }
-
-  // Calculate totals
-  const totalSpent = orders ? orders.reduce((sum, order) => sum + order.total_amount, 0) : 0;
-  const totalOrders = orders ? orders.length : 0;
-
-  // Update customer stats
-  await updateCustomerStats(customerId, totalOrders, totalSpent);
 };
