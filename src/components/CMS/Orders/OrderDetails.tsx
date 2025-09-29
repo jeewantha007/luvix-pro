@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, ArrowLeft, User, CreditCard, MapPin, Clock } from 'lucide-react';
+import { FileText, ArrowLeft, User, CreditCard, MapPin, Clock, DollarSign } from 'lucide-react';
 import { Order } from '../../../types';
 
 interface OrderDetailsProps {
-  orderItem: Order | null;
+  order: Order | null;
   onBack: () => void;
 }
 
-const OrderDetails: React.FC<OrderDetailsProps> = ({ orderItem, onBack }) => {
-  const [currentOrder, setCurrentOrder] = useState<Order | null>(orderItem);
+const OrderDetails: React.FC<OrderDetailsProps> = ({ order, onBack }) => {
+  const [currentOrder, setCurrentOrder] = useState<Order | null>(order);
 
   useEffect(() => {
-    setCurrentOrder(orderItem);
-  }, [orderItem]);
+    setCurrentOrder(order);
+  }, [order]);
 
   if (!currentOrder) {
     return (
@@ -114,6 +114,45 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderItem, onBack }) => {
 
       {/* Content */}
       <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Order Summary - New Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Total Amount</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {formatCurrency(currentOrder.totalAmount || 0)}
+                </p>
+              </div>
+              <DollarSign className="w-8 h-8 text-gray-500" />
+            </div>
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Total Items</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentOrder.items.reduce((total, item) => total + Math.max(item.quantity || 0, 0), 0)}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  ({currentOrder.items.length} {currentOrder.items.length === 1 ? 'product' : 'products'})
+                </p>
+              </div>
+              <FileText className="w-8 h-8 text-gray-500" />
+            </div>
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {currentOrder.status.charAt(0).toUpperCase() + currentOrder.status.slice(1)}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {currentOrder.paymentStatus}
+                </p>
+              </div>
+              <div className={`w-8 h-8 rounded-full ${getStatusColor(currentOrder.status).split(' ')[0]}`}></div>
+            </div>
+          </div>
+        </div>
+
         {/* Customer Information */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
@@ -127,7 +166,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderItem, onBack }) => {
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">WhatsApp Number</p>
-              <p className="text-sm text-gray-900 dark:text-white">{currentOrder.customerId}</p>
+              <p className="text-sm text-gray-900 dark:text-white">{currentOrder.contactNo}</p>
             </div>
           </div>
         </div>
@@ -217,6 +256,13 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderItem, onBack }) => {
                 <p className="text-sm text-gray-900 dark:text-white">{formatDateForDisplay(currentOrder.updatedAt)}</p>
               </div>
             </div>
+            <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <DollarSign className="w-5 h-5 text-gray-500" />
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Amount</p>
+                <p className="text-sm text-gray-900 dark:text-white font-medium">{formatCurrency(currentOrder.totalAmount || 0)}</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -226,65 +272,145 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderItem, onBack }) => {
             <CreditCard className="w-5 h-5 mr-2 text-gray-500" />
             Financials
           </h2>
-          <div className="flex justify-end">
-            <div className="w-full md:w-1/3">
-              <div className="space-y-2">
-                {currentOrder.taxAmount !== undefined && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-300">Tax Amount</span>
-                    <span className="text-gray-900 dark:text-white">{formatCurrency(currentOrder.taxAmount)}</span>
-                  </div>
-                )}
-                {currentOrder.discountAmount !== undefined && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-300">Discount Amount</span>
-                    <span className="text-gray-900 dark:text-white">{formatCurrency(currentOrder.discountAmount)}</span>
-                  </div>
-                )}
-                {currentOrder.shippingAmount !== undefined && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-300">Shipping Amount</span>
-                    <span className="text-gray-900 dark:text-white">{formatCurrency(currentOrder.shippingAmount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm font-medium">
-                  <span className="text-gray-600 dark:text-gray-300">Total Amount</span>
-                  <span className="text-gray-900 dark:text-white">{formatCurrency(currentOrder.totalAmount)}</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center">
+                  <DollarSign className="w-5 h-5 text-gray-500 mr-2" />
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Subtotal</span>
                 </div>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {formatCurrency((currentOrder.totalAmount || 0) - (currentOrder.taxAmount || 0) - (currentOrder.shippingAmount || 0) + (currentOrder.discountAmount || 0))}
+                </span>
+              </div>
+              
+              {currentOrder.discountAmount !== undefined && currentOrder.discountAmount > 0 && (
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Discount</span>
+                  </div>
+                  <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                    -{formatCurrency(currentOrder.discountAmount)}
+                  </span>
+                </div>
+              )}
+              
+              {currentOrder.taxAmount !== undefined && currentOrder.taxAmount > 0 && (
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Tax</span>
+                  </div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    +{formatCurrency(currentOrder.taxAmount)}
+                  </span>
+                </div>
+              )}
+              
+              {currentOrder.shippingAmount !== undefined && currentOrder.shippingAmount > 0 && (
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Shipping</span>
+                  </div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    +{formatCurrency(currentOrder.shippingAmount)}
+                  </span>
+                </div>
+              )}
+              
+              <div className="flex justify-between items-center p-3 bg-gray-100 dark:bg-gray-600 rounded-lg mt-2">
+                <div className="flex items-center">
+                  <DollarSign className="w-5 h-5 text-gray-700 dark:text-gray-300 mr-2" />
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Total Amount</span>
+                </div>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {formatCurrency(currentOrder.totalAmount || 0)}
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex flex-col justify-center items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {formatCurrency(currentOrder.totalAmount || 0)}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">Order Total</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                {currentOrder.items.reduce((total, item) => total + Math.max(item.quantity || 0, 0), 0)} items
               </div>
             </div>
           </div>
         </div>
 
         {/* Products */}
-        {currentOrder.products.length > 0 && (
+        {currentOrder.items.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-              <FileText className="w-5 h-5 mr-2 text-gray-500" />
-              Products
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <FileText className="w-5 h-5 mr-2 text-gray-500" />
+                Products
+              </h2>
+              <div className="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded-full text-sm font-medium">
+                <FileText className="w-4 h-4 mr-1" />
+                {currentOrder.items.length} {currentOrder.items.length === 1 ? 'item' : 'items'}
+              </div>
+            </div>
             <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Product</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">SKU</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Unit Price</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Quantity</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {currentOrder.products.map((p, idx) => (
-                    <tr key={idx}>
-                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{p.productName}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{p.sku || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-white text-right">{formatCurrency(p.unitPrice)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-white text-right">{p.quantity}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-white text-right">{formatCurrency(p.totalPrice)}</td>
+                  {currentOrder.items.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-4 py-4 text-sm text-gray-900 dark:text-white">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0">
+                            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 flex items-center justify-center">
+                              <span className="text-xs text-gray-500 dark:text-gray-400">No image</span>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="font-medium">{item.productName}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              ID: {item.productId.substring(0, 8)}...
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-900 dark:text-white text-right">
+                        <div className="font-medium">{formatCurrency(item.unitPrice)}</div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-900 dark:text-white text-right">
+                        <div className="font-medium">{item.quantity}</div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-900 dark:text-white text-right">
+                        <div className="font-medium">{formatCurrency(item.totalPrice || 0)}</div>
+                        {item.quantity && item.unitPrice && item.quantity > 1 && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            ({item.quantity} × {formatCurrency(item.unitPrice)})
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
+                <tfoot className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <td colSpan={2} className="px-4 py-3 text-sm text-gray-900 dark:text-white font-medium">
+                      Total Items
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white text-right font-medium">
+                      {currentOrder.items.reduce((total, item) => total + Math.max(item.quantity || 0, 0), 0)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white text-right font-medium">
+                      {formatCurrency(currentOrder.totalAmount || 0)}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>

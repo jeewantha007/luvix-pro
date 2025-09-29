@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   User, ArrowLeft, Phone, Mail, MapPin, Calendar,
-  DollarSign
+  DollarSign, Users
 } from 'lucide-react';
 import { Client } from '../../../types';
 import { useApp } from '../../../context/AppContext';
@@ -22,9 +22,9 @@ const ClientDetails: React.FC<ClientDetailsProps> = ({ client, onBack }) => {
           <div className="w-32 h-32 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-6">
             <User className="w-16 h-16 text-gray-400 dark:text-gray-500" />
           </div>
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">Client Management</h2>
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">Customer Management</h2>
           <p className="text-gray-600 dark:text-gray-300 max-w-md">
-            Select a client from the list to view detailed information and manage their immigration process.
+            Select a customer from the list to view detailed information.
           </p>
         </div>
       </div>
@@ -125,12 +125,12 @@ const ClientDetails: React.FC<ClientDetailsProps> = ({ client, onBack }) => {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                   {client.name}
                 </h2>
-                                  <div className="flex items-center gap-3">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${getStatusColor(client.status)}`}>
-                      {getStatusIcon(client.status)}
-                      {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
-                    </span>
-                  </div>
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${getStatusColor(client.status)}`}>
+                    {getStatusIcon(client.status)}
+                    {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

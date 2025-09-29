@@ -505,8 +505,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
               
               <div className="space-y-4">
                 {formData.items.map((item, index) => (
-                  <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                       <div className="md:col-span-5">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product *</label>
                         <select
@@ -521,6 +521,82 @@ const OrderForm: React.FC<OrderFormProps> = ({
                             </option>
                           ))}
                         </select>
+                        
+                        {/* Product Image Preview */}
+                        {item.productId && (
+                          <div className="mt-3">
+                            {(() => {
+                              const selectedProduct = products.find(p => p.id === item.productId);
+                              const images = selectedProduct?.images || [];
+                              return images.length > 0 ? (
+                                <div className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                  <div className="flex-shrink-0 relative">
+                                    <img 
+                                      src={images[0]} 
+                                      alt={selectedProduct?.name || 'Product'} 
+                                      className="w-16 h-16 object-cover rounded border border-gray-200 dark:border-gray-600"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                      }}
+                                    />
+                                    {images.length > 1 && (
+                                      <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center" title={`${images.length} images`}>
+                                        +{images.length - 1}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                      {selectedProduct?.name || 'Product'}
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                      ${selectedProduct?.price.toFixed(2) || '0.00'}
+                                    </p>
+                                    {images.length > 1 && (
+                                      <div className="flex gap-1 mt-1">
+                                        {images.slice(0, 3).map((img, idx) => (
+                                          <div key={idx} className="w-4 h-4 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
+                                            <img 
+                                              src={img} 
+                                              alt={`Preview ${idx + 1}`} 
+                                              className="w-full h-full object-cover"
+                                              onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.style.display = 'none';
+                                              }}
+                                            />
+                                          </div>
+                                        ))}
+                                        {images.length > 3 && (
+                                          <div className="w-4 h-4 rounded border border-gray-200 dark:border-gray-600 bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">+{images.length - 3}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                  <div className="flex-shrink-0">
+                                    <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 flex items-center justify-center">
+                                      <span className="text-xs text-gray-500 dark:text-gray-400 text-center">No image</span>
+                                    </div>
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                      {selectedProduct?.name || 'Product'}
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                      ${selectedProduct?.price.toFixed(2) || '0.00'}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity</label>
@@ -534,29 +610,36 @@ const OrderForm: React.FC<OrderFormProps> = ({
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unit Price</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.unitPrice}
-                          readOnly
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
-                        />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.unitPrice}
+                            readOnly
+                            className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
+                          />
+                        </div>
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Total</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.totalPrice?.toFixed(2) || '0.00'}
-                          readOnly
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
-                        />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.totalPrice?.toFixed(2) || '0.00'}
+                            readOnly
+                            className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
+                          />
+                        </div>
                       </div>
-                      <div className="md:col-span-1 flex items-end">
+                      <div className="md:col-span-1 flex items-start justify-center pt-6">
                         <button
                           type="button"
                           onClick={() => handleRemoveItem(index)}
                           className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          title="Remove item"
                         >
                           <Trash2 className="w-5 h-5" />
                         </button>
@@ -566,7 +649,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
                 ))}
                 
                 {formData.items.length === 0 && (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                     <p>No items added yet. Click "Add Item" to add products to this order.</p>
                   </div>
                 )}

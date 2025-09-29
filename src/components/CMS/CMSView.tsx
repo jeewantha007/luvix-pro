@@ -4,6 +4,8 @@ import { useIsMobile } from '../../hooks/useMediaQuery';
 import ClientList from './Clients/ClientList';
 import OrderList from './Orders/OrderList';
 import ProductList from './Products/ProductList';
+import OrderDetails from './Orders/OrderDetails';
+import ClientDetails from './Clients/ClientDetails';
 
 type CMSModule = 'customers' | 'orders' | 'products';
 
@@ -158,14 +160,28 @@ const CMSView: React.FC = () => {
         <div className="flex-1 overflow-hidden h-full">
           {activeModule === 'products' && <ProductList />}
 
-          {activeModule === 'customers' && (
+          {activeModule === 'customers' && selectedItem && (
+            <ClientDetails
+              client={selectedItem}
+              onBack={() => setSelectedItem(null)}
+            />
+          )}
+          
+          {activeModule === 'customers' && !selectedItem && (
             <ClientList
               selectedClient={selectedItem}
               onClientSelect={setSelectedItem}
             />
           )}
           
-          {activeModule === 'orders' && (
+          {activeModule === 'orders' && selectedItem && (
+            <OrderDetails
+              order={selectedItem}
+              onBack={() => setSelectedItem(null)}
+            />
+          )}
+          
+          {activeModule === 'orders' && !selectedItem && (
             <OrderList
               selectedOrder={selectedItem}
               onOrderSelect={setSelectedItem}

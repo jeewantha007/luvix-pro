@@ -135,20 +135,43 @@ export const createOrder = async (order: Omit<Order, "id" | "createdAt" | "updat
   }
 };
 
-// Fetch all orders
+// Fetch all orders with their items
 export const getOrders = async (): Promise<Order[]> => {
   try {
-    const { data, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+    const { data: orders, error: ordersError } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false });
     
-    if (error) throw new Error(`Failed to fetch orders: ${error.message}`);
+    if (ordersError) throw new Error(`Failed to fetch orders: ${ordersError.message}`);
     
     // If no orders exist, return empty array
-    if (!data || data.length === 0) {
+    if (!orders || orders.length === 0) {
       return [];
     }
     
+    // Extract order IDs to fetch all items in one query
+    const orderIds = orders.map((order: any) => order.id);
+    
+    // Fetch all order items for these orders
+    const { data: items, error: itemsError } = await supabase
+      .from("order_items")
+      .select("*")
+      .in("order_id", orderIds);
+    
+    if (itemsError) throw new Error(`Failed to fetch order items: ${itemsError.message}`);
+    
+    // Group items by order_id for easier mapping
+    const itemsByOrderId: { [key: string]: any[] } = {};
+    items.forEach((item: any) => {
+      if (!itemsByOrderId[item.order_id]) {
+        itemsByOrderId[item.order_id] = [];
+      }
+      itemsByOrderId[item.order_id].push(item);
+    });
+    
     // Map the database response to our Order interface
-    const mappedOrders: Order[] = data.map((order: any) => ({
+    const mappedOrders: Order[] = orders.map((order: any) => ({
       id: order.id,
       orderNumber: order.order_number,
       userId: order.user_id,
@@ -166,7 +189,16 @@ export const getOrders = async (): Promise<Order[]> => {
       taxAmount: order.tax_amount,
       discountAmount: order.discount_amount,
       shippingAmount: order.shipping_amount,
-      items: [], // Items would need to be fetched separately if needed
+      items: (itemsByOrderId[order.id] || []).map((item: any) => ({
+        id: item.id,
+        orderId: item.order_id,
+        productId: item.product_id,
+        productName: item.product_name,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+        totalPrice: item.total_price,
+        createdAt: item.created_at ? new Date(item.created_at) : new Date()
+      })),
       createdAt: order.created_at ? new Date(order.created_at) : new Date(),
       updatedAt: order.updated_at ? new Date(order.updated_at) : new Date()
     }));
